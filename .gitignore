@@ -1,0 +1,14 @@
+.DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.sqlite3*
+*.db*
+ios/*.xcodeproj/
+ios/.build/
+ios/.swiftpm/
+DerivedData/
+xcuserdata/
+work/
+.env
