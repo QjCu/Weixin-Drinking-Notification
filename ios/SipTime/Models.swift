@@ -54,11 +54,17 @@ struct ReminderPlan: Codable {
     var pausedDay: LocalDay? = nil
     var offsetMinutes = 0
     var slots = [
-        BreakSlot(title: "上午课间", minute: 9 * 60 + 40),
-        BreakSlot(title: "午间", minute: 11 * 60 + 40, duration: 60),
-        BreakSlot(title: "下午课间", minute: 15 * 60 + 40),
-        BreakSlot(title: "傍晚", minute: 17 * 60 + 30, duration: 60),
-        BreakSlot(title: "晚间课间", minute: 20 * 60 + 30)
+        BreakSlot(title: "课间1", minute: 8 * 60 + 50, duration: 10),
+        BreakSlot(title: "课间2", minute: 9 * 60 + 50, duration: 20),
+        BreakSlot(title: "上午课间", minute: 11 * 60, duration: 10),
+        BreakSlot(title: "午休", minute: 12 * 60, duration: 60),
+        BreakSlot(title: "课间3", minute: 13 * 60 + 50, duration: 10),
+        BreakSlot(title: "下午课间", minute: 14 * 60 + 50, duration: 20),
+        BreakSlot(title: "课间4", minute: 16 * 60, duration: 10),
+        BreakSlot(title: "课间5", minute: 17 * 60, duration: 10),
+        BreakSlot(title: "课间6", minute: 18 * 60, duration: 40),
+        BreakSlot(title: "课间7", minute: 19 * 60 + 30, duration: 10),
+        BreakSlot(title: "课间8", minute: 20 * 60 + 30, duration: 10)
     ]
     var rules: [ReminderRule] = []
 }

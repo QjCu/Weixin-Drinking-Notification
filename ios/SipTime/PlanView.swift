@@ -84,8 +84,8 @@ struct PlanView: View {
                     Button("添加课间", systemImage: "plus") {
                         editingSlot = BreakSlot(title: "新课间", minute: 10 * 60)
                     }
-                    Button("使用示例作息") { showPreset = true }
-                } header: { Text("学校作息表") } footer: { Text("内置作息为示例，请按学校实际时间修改。编辑时间会同步影响已选择的课间；左滑可删除。") }
+                    Button("选择作息模板") { showPreset = true }
+                } header: { Text("学校作息表") } footer: { Text("默认作息可按学校实际时间修改，也可在作息模板中恢复。编辑时间会同步影响已选择的课间；左滑可删除。") }
 
                 Section {
                     ForEach(regularRules) { rule in
@@ -128,7 +128,8 @@ struct PlanView: View {
                     })
                 }
             }
-            .confirmationDialog("应用示例会清除原课间选择，普通提醒将保留。", isPresented: $showPreset, titleVisibility: .visible) {
+            .confirmationDialog("应用作息模板会清除原课间选择，普通提醒将保留。", isPresented: $showPreset, titleVisibility: .visible) {
+                Button("恢复默认作息 · 11 个时段") { applySlots(ReminderPlan().slots) }
                 Button("示例 A · 09:40 / 11:40 / 15:40") { usePreset(early: false) }
                 Button("示例 B · 09:30 / 11:30 / 15:30") { usePreset(early: true) }
             }
@@ -144,12 +145,22 @@ struct PlanView: View {
             draft.rules.append(ReminderRule(weekday: weekday, minute: slot.minute, kind: kind, slotID: slot.id))
         }
     }
-    private func usePreset(early: Bool) {
+    private func applySlots(_ slots: [BreakSlot]) {
         draft.rules.removeAll { $0.slotID != nil }
-        draft.slots = ReminderPlan().slots
+        draft.slots = slots
+    }
+    private func usePreset(early: Bool) {
+        var slots = [
+            BreakSlot(title: "上午课间", minute: 9 * 60 + 40),
+            BreakSlot(title: "午间", minute: 11 * 60 + 40, duration: 60),
+            BreakSlot(title: "下午课间", minute: 15 * 60 + 40),
+            BreakSlot(title: "傍晚", minute: 17 * 60 + 30, duration: 60),
+            BreakSlot(title: "晚间课间", minute: 20 * 60 + 30)
+        ]
         if early {
-            for index in draft.slots.indices where index != 3 { draft.slots[index].minute -= 10 }
+            for index in slots.indices where index != 3 { slots[index].minute -= 10 }
         }
+        applySlots(slots)
     }
 }
 
