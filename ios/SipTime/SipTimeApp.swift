@@ -17,6 +17,7 @@ struct RootView: View {
     var body: some View {
         TabView {
             TodayView().tabItem { Label("今天", systemImage: "drop") }
+            CourseTimetableView().tabItem { Label("课表", systemImage: "tablecells") }
             PlanView().tabItem { Label("提醒计划", systemImage: "calendar") }
             FriendView().tabItem { Label("好友", systemImage: "bubble.left.and.bubble.right") }
         }

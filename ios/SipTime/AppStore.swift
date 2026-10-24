@@ -116,6 +116,25 @@ final class AppStore: ObservableObject {
         plan.pausedDay = plan.pausedDay == LocalDay(Date()) ? nil : LocalDay(Date())
         await apply(plan)
     }
+    @discardableResult
+    func applyTimetable(_ timetable: CourseTimetable, termStart: LocalDay? = nil,
+                        termWeeks: Int? = nil) async -> Bool {
+        var saved = false
+        await perform {
+            let previous = self.state
+            if let termStart { self.state.plan.termStart = termStart }
+            if let termWeeks { self.state.plan.termWeeks = termWeeks }
+            self.state.timetable = timetable
+            do { try self.save() }
+            catch { self.state = previous; throw error }
+            saved = true
+            if previous.plan.termStart != self.state.plan.termStart || previous.plan.termWeeks != self.state.plan.termWeeks {
+                try await self.rebuild()
+            }
+            self.notice = "课表已保存"
+        }
+        return saved
+    }
     func requestNotifications() async {
         await perform {
             try await self.scheduler.requestPermission()

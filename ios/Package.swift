@@ -8,8 +8,9 @@ let package = Package(
     targets: [
         .target(name: "SipTimeCore", path: "SipTime",
                 exclude: ["APIClient.swift", "AppStore.swift", "FriendView.swift", "NotificationScheduler.swift",
-                          "PlanView.swift", "SipTimeApp.swift", "Info.plist", "Info-Debug.plist"],
-                sources: ["Models.swift"]),
+                          "PlanView.swift", "SipTimeApp.swift", "CourseTimetableView.swift", "CourseImportView.swift",
+                          "CourseCapture.swift", "Info.plist", "Info-Debug.plist"],
+                sources: ["Models.swift", "CourseModels.swift", "CourseImportParser.swift"]),
         .testTarget(name: "SipTimeCoreTests", dependencies: ["SipTimeCore"], path: "SipTimeTests")
     ]
 )

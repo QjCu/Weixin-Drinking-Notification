@@ -142,6 +142,8 @@ struct NoteAssignment: Codable {
 
 struct LocalState: Codable {
     var plan = ReminderPlan()
+    // Optional so state.json written before course import still decodes unchanged.
+    var timetable: CourseTimetable? = nil
     var serverURL = "http://localhost:8000"
     var accountID: String? = nil
     var notes: [FriendNote] = []
