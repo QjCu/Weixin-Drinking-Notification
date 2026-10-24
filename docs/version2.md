@@ -42,6 +42,6 @@ GitHub 分支：`version2`，基于 `codex/siptime-mvp` 创建。后续需求继
 - 课表随本地状态保存，兼容未包含课表字段的旧记录。学期日期与提醒计划共用，修改学期会重建提醒；导入课程不会自动点选喝水课间。
 - 新增学校适配协议和注册表，复用统一课程模型与显示逻辑。网页登录使用不写磁盘的 WebKit 会话，截图和页面识别不上传到留言服务器。
 
-验证：已使用 Linux Swift 6.0.3 实际通过 27 项核心测试（17 项课程导入/显示测试及原有 10 项提醒测试），覆盖单双周显示、部分重叠、HTML/文字/坐标解析、无效时间、导入合并和旧状态兼容。Swift 文件语法检查通过。当前环境没有 Xcode，尚未完成 iOS 编译、实际 Vision OCR、学校登录网页或真机界面验收。
+验证：已使用 Linux Swift 6.0.3 实际通过 28 项核心测试（18 项课程导入/显示测试及原有 10 项提醒测试），覆盖单双周显示、部分重叠、HTML/文字/坐标解析、无效时间、导入合并和旧状态兼容。Swift 文件语法检查通过。[代码提交 e504f62 的 GitHub Actions](https://github.com/QjCu/Weixin-Drinking-Notification/actions/runs/40114222228) 已通过 macOS 上的 28 项 Swift 测试、iPhone 模拟器编译及服务端检查；编译日志为 BUILD SUCCEEDED。实际 Vision OCR、学校登录网页、界面操作或真机通知尚未验收。
 
 使用与扩展方法见 [课表导入与学校适配](course-import.md)。已有 Mac 工程需要在保留签名配置后重新运行 XcodeGen，以加入新增文件。
