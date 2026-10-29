@@ -78,17 +78,20 @@ final class CourseWebSessionTests: XCTestCase {
     private func loadFixture(_ webView: WKWebView, body: String) async throws {
         webView.loadHTMLString("<html><body>\(body)<script>window.fixtureReady = true;</script></body></html>",
                                baseURL: URL(string: "https://iaaa.pku.edu.cn/"))
-        try await waitForJavaScript(webView, expression: "window.fixtureReady === true")
+        // A freshly booted CI simulator must start WebKit's content/network processes once.
+        // Keep functional popup/dialog waits short, but allow that initial local page to start.
+        try await waitForJavaScript(webView, expression: "window.fixtureReady === true", timeout: 30)
     }
 
-    private func waitForJavaScript(_ webView: WKWebView, expression: String) async throws {
-        let deadline = Date().addingTimeInterval(10)
+    private func waitForJavaScript(_ webView: WKWebView, expression: String, timeout: TimeInterval = 10) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if let value = try? await webView.evaluateJavaScript("Boolean(\(expression))"),
                value as? Bool == true { return }
-            try await Task.sleep(nanoseconds: 25_000_000)
+            try await Task.sleep(nanoseconds: 50_000_000)
         }
-        XCTFail("Local WebKit fixture was not ready: \(expression)")
+        let navigationError = (webView.navigationDelegate as? CourseWebSession)?.error ?? "none"
+        XCTFail("Local WebKit fixture was not ready: \(expression); loading=\(webView.isLoading); navigationError=\(navigationError)")
         throw FixtureError.timeout
     }
 
