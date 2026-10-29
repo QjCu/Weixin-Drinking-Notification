@@ -277,7 +277,7 @@ private struct CourseCatalogView: View {
                 }.pickerStyle(.segmented)
                 Picker("课程范围", selection: $scope) {
                     ForEach(CourseListScope.allCases, id: \.self) { value in
-                        Text(value == .week && week != nil ? "第\(week!)周" : value.rawValue).tag(value)
+                        Text(value == .week ? (week.map { "第\($0)周" } ?? "本周") : value.rawValue).tag(value)
                     }
                 }.pickerStyle(.menu).fixedSize()
             }.padding(.horizontal).padding(.bottom, 8)
@@ -313,7 +313,7 @@ private struct CourseCompactSummary: View {
     let meetings: [CourseMeeting]
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(course.displayTitle).font(.headline)
+            Text(course.displayTitle).font(.headline).foregroundStyle(.primary)
             Text("教师：\(course.teacher.isEmpty ? "未填写" : course.teacher)")
             Text("教室：\(uniqueLabels(meetings.map(\.location)).isEmpty ? "未填写" : uniqueLabels(meetings.map(\.location)).joined(separator: "、"))")
             Text("单双周：\(uniqueLabels(meetings.map { $0.kind.title }).joined(separator: "、"))")
