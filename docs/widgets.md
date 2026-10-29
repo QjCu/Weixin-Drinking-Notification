@@ -33,3 +33,7 @@ SIPTIME_APP_GROUP: group.你注册的唯一共享组标识
 小组件预先生成上课、课间、下课和午夜等边界的 timeline，数据改变后请求系统重新读取。小组件不是常驻 App，iOS 会根据刷新预算调度，不能保证秒级时间线或强制准时刷新；因此桌面不提供 App 内那条每秒移动的红线。苹果说明：[保持小组件更新](https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date)。
 
 如果课表缺失，先打开 App 保存课表并检查“今天”的同步状态；如果不能共享，检查两个 target 的团队、App Groups 和自定义标识配置。系统重启后首次解锁前，数据受文件保护，小组件可能暂不可读。没有课程、学期外、作息不匹配都有提示，示例课程仅用于系统预览。
+
+## 验证记录
+
+[33deddb 的检查](https://github.com/QjCu/Weixin-Drinking-Notification/actions/runs/40863447651) 已通过 55 项核心测试、App 与小组件扩展编译及 4 项现有模拟器回归测试。实际团队签名、共享容器权限、桌面渲染与系统刷新节奏仍需真机验收；编译通过不代表你的 Team/App Group 已配置成功。
