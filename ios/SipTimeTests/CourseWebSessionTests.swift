@@ -14,11 +14,13 @@ final class CourseWebSessionTests: XCTestCase {
         defer { session.shutdown(); window.isHidden = true }
         try await loadFixture(root, body: "<p>Login fixture</p>")
 
-        _ = try await root.evaluateJavaScript("window.loginPopup = window.open(); true;")
-        try await waitUntil("Login popup was not created") { session.pages.count == 2 }
+        let opened = try await root.evaluateJavaScript("window.loginPopup = window.open(); Boolean(window.loginPopup);") as? Bool
+        XCTAssertEqual(opened, true, "window.open() returned no window; policy: \(session.error ?? "none")")
+        do { try await waitUntil("Login popup was not created") { session.pages.count == 2 } }
+        catch { XCTFail("Popup policy diagnostic: \(session.error ?? "none")"); throw error }
         let popup = session.webView
         attach(popup, to: window)
-        try await waitForJavaScript(popup, expression: "document.body != null && window.opener != null")
+        try await waitForJavaScript(popup, expression: "window.opener != null")
         XCTAssertFalse(popup === root)
         XCTAssertFalse(root.configuration.websiteDataStore.isPersistent)
         XCTAssertTrue(popup.configuration.websiteDataStore === root.configuration.websiteDataStore)

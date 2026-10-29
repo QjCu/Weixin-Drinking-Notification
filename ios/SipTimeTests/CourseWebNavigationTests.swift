@@ -52,6 +52,18 @@ final class CourseWebNavigationTests: XCTestCase {
         XCTAssertNil(CourseWebNavigationPolicy.addressURL("javascript:alert(1)"))
     }
 
+    func testWindowOpenEmptyRequestURLBecomesBlankOnlyInNewWindowContext() throws {
+        let empty = try XCTUnwrap(URL(string: ""))
+        XCTAssertEqual(CourseWebNavigationPolicy.navigationURL(empty, isNewWindow: true)?.absoluteString, "about:blank")
+        XCTAssertEqual(CourseWebNavigationPolicy.navigationURL(nil, isNewWindow: true)?.absoluteString, "about:blank")
+        XCTAssertEqual(CourseWebNavigationPolicy.navigationURL(empty, isNewWindow: false), empty)
+        XCTAssertNil(CourseWebNavigationPolicy.navigationURL(nil, isNewWindow: false))
+        let callback = URL(string: "http://elective.pku.edu.cn/ssoLogin.do?token=example")!
+        XCTAssertEqual(CourseWebNavigationPolicy.navigationURL(callback, isNewWindow: true), callback)
+        let relative = URL(string: "not-a-blank-page")!
+        XCTAssertEqual(CourseWebNavigationPolicy.navigationURL(relative, isNewWindow: true), relative)
+    }
+
     func testAddressBarDefaultsToHTTPSAndAllowsExplicitLegacySchoolAddress() throws {
         XCTAssertEqual(try XCTUnwrap(CourseWebNavigationPolicy.addressURL(" iaaa.pku.edu.cn/iaaa/oauth.jsp \n")).scheme, "https")
         XCTAssertEqual(try XCTUnwrap(CourseWebNavigationPolicy.addressURL("http://elective.pku.edu.cn/")).scheme, "http")

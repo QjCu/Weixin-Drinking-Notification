@@ -10,6 +10,15 @@ enum CourseWebNavigationPolicy {
 
     static let legacyHTTPHosts: Set<String> = ["elective.pku.edu.cn", "portal.pku.edu.cn"]
 
+    /// WebKit represents window.open() without arguments as a non-nil, empty URL.
+    /// It creates a blank popup context, rather than navigating the address bar.
+    static func navigationURL(_ url: URL?, isNewWindow: Bool) -> URL? {
+        if isNewWindow, url == nil || url?.absoluteString.isEmpty == true {
+            return URL(string: "about:blank")
+        }
+        return url
+    }
+
     static func addressURL(_ input: String) -> URL? {
         let input = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !input.isEmpty else { return nil }

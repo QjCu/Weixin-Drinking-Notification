@@ -401,17 +401,21 @@ final class CourseWebSession: NSObject, ObservableObject, WKNavigationDelegate, 
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        let requestedURL = navigationAction.request.url ??
-            (navigationAction.targetFrame == nil ? URL(string: "about:blank") : nil)
+        let originalURL = navigationAction.request.url
+        let originalValue = originalURL?.absoluteString.lowercased() ?? ""
+        // WebKit intentionally carries an empty (not necessarily nil) URL for window.open().
+        // Newly created popup main frames can repeat that placeholder before being navigated.
+        let isPopupPlaceholder = webView !== pages.first &&
+            ["", "about:blank", "about:srcdoc"].contains(originalValue)
+        let isNewWindow = navigationAction.targetFrame == nil || isPopupPlaceholder
+        let requestedURL = CourseWebNavigationPolicy.navigationURL(originalURL, isNewWindow: isNewWindow)
         guard !isShuttingDown, let url = requestedURL else {
             decisionHandler(.cancel)
             return
         }
-        // A newly created popup may first navigate its main frame to about:blank.
-        let isPopupBlank = webView !== pages.first && ["about:blank", "about:srcdoc"].contains(url.absoluteString.lowercased())
         switch CourseWebNavigationPolicy.decision(for: url,
                 isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
-                isNewWindow: navigationAction.targetFrame == nil || isPopupBlank) {
+                isNewWindow: isNewWindow) {
         case .allow:
             // Let WKUIDelegate create real popup contexts. Loading into the opener breaks SSO callbacks.
             decisionHandler(.allow)
@@ -425,7 +429,9 @@ final class CourseWebSession: NSObject, ObservableObject, WKNavigationDelegate, 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         guard !isShuttingDown else { return nil }
-        let url = navigationAction.request.url ?? URL(string: "about:blank")!
+        guard let url = CourseWebNavigationPolicy.navigationURL(navigationAction.request.url, isNewWindow: true) else {
+            return nil
+        }
         switch CourseWebNavigationPolicy.decision(for: url, isMainFrame: true, isNewWindow: true) {
         case .block(let reason): error = reason; return nil
         case .allow: break
