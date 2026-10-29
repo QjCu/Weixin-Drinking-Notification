@@ -20,7 +20,7 @@ struct CourseTimetableView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                weekControls
+                if page == .timetable { weekControls }
                 Picker("课表页面", selection: $page) {
                     ForEach(CoursePage.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
@@ -40,7 +40,7 @@ struct CourseTimetableView: View {
                     }
                 } else if let week = shownWeek {
                     CourseTimetableGrid(courses: timetable.courses, week: week,
-                                        termStart: store.state.plan.termStart, onSelect: { entries in
+                                        termStart: store.state.plan.termStart, plan: store.state.plan, onSelect: { entries in
                         selection = CourseSelection(courseIDs: distinctCourses(entries.map(\.course)).map(\.id),
                                                     title: "课程详情")
                     })
@@ -111,6 +111,7 @@ struct CourseTimetableGrid: View {
     let courses: [Course]
     let week: Int
     let termStart: LocalDay
+    let plan: ReminderPlan
     var onSelect: ([TimetableEntry]) -> Void = { _ in }
     var onCellFrames: (([CourseGridPosition: CGRect]) -> Void)? = nil
     @ScaledMetric(relativeTo: .caption) private var cellHeight: CGFloat = 88
@@ -119,12 +120,15 @@ struct CourseTimetableGrid: View {
     private let sidePadding: CGFloat = 8
     private var lastPeriod: Int { max(12, courses.flatMap(\.meetings).map(\.endPeriod).max() ?? 12) }
 
-    init(courses: [Course], week: Int, termStart: LocalDay,
+    init(courses: [Course], week: Int, termStart: LocalDay, plan: ReminderPlan? = nil,
          onSelect: @escaping ([TimetableEntry]) -> Void = { _ in },
          onCellFrames: (([CourseGridPosition: CGRect]) -> Void)? = nil) {
         self.courses = courses
         self.week = week
         self.termStart = termStart
+        var clockPlan = plan ?? ReminderPlan()
+        clockPlan.termStart = termStart
+        self.plan = clockPlan
         self.onSelect = onSelect
         self.onCellFrames = onCellFrames
     }
@@ -132,18 +136,27 @@ struct CourseTimetableGrid: View {
     var body: some View {
         GeometryReader { geometry in
             let width = max(1, (geometry.size.width - sidePadding * 2 - gutter - gap * 7) / 7)
+            TimelineView(.periodic(from: .now, by: 1)) { context in
             ScrollView(.vertical) {
                 VStack(spacing: gap) {
                     dayHeader(width: width)
                     ForEach(1...lastPeriod, id: \.self) { period in
-                        periodRow(period, width: width)
+                        periodRow(period, width: width, now: context.date)
                     }
+                    if CourseClock.periods(plan: plan).count != lastPeriod {
+                        Text("作息课间与课表节次数不匹配，时间线暂不显示。请在提醒计划中核对学校作息。")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                }
+                .overlay(alignment: .topLeading) {
+                    timeIndicator(now: context.date, columnWidth: width)
                 }
                 .padding(.horizontal, sidePadding).padding(.bottom, 8)
                 .frame(width: geometry.size.width)
             }
             .coordinateSpace(name: "course-grid")
             .onPreferenceChange(CourseCellFramesKey.self) { onCellFrames?($0) }
+            }
         }
     }
 
@@ -164,13 +177,13 @@ struct CourseTimetableGrid: View {
         }.foregroundStyle(.secondary)
     }
 
-    private func periodRow(_ period: Int, width: CGFloat) -> some View {
+    private func periodRow(_ period: Int, width: CGFloat, now: Date) -> some View {
         HStack(spacing: gap) {
             Text("\(period)").font(.caption.monospacedDigit())
                 .frame(width: gutter, height: cellHeight).foregroundStyle(.secondary)
             ForEach(1...7, id: \.self) { day in
                 let entries = TimetableEngine.entries(courses: courses, week: week, weekday: day, period: period)
-                CoursePeriodCell(entries: entries) { onSelect(entries) }
+                CoursePeriodCell(entries: entries, isCurrent: isCurrent(entries: entries, day: day, now: now)) { onSelect(entries) }
                     .frame(width: width, height: cellHeight)
                     .accessibilityIdentifier("course-cell-\(day)-\(period)")
                     .accessibilityLabel(cellLabel(entries, day: day, period: period))
@@ -186,6 +199,28 @@ struct CourseTimetableGrid: View {
         }
     }
 
+    private func isCurrent(entries: [TimetableEntry], day: Int, now: Date) -> Bool {
+        let periods = CourseClock.periods(plan: plan)
+        guard periods.count == lastPeriod,
+              CourseClock.weekday(on: now, displayedWeek: week, plan: plan) == day,
+              let period = CourseClock.activePeriod(at: CourseClock.minute(on: now), periods: periods) else { return false }
+        return entries.contains { $0.isActive && ($0.meeting.startPeriod...$0.meeting.endPeriod).contains(period) }
+    }
+
+    @ViewBuilder
+    private func timeIndicator(now: Date, columnWidth: CGFloat) -> some View {
+        if CourseClock.periods(plan: plan).count == lastPeriod,
+           let day = CourseClock.weekday(on: now, displayedWeek: week, plan: plan),
+           let y = CourseClock.position(at: CourseClock.minute(on: now), periods: CourseClock.periods(plan: plan),
+                                        rowHeight: Double(cellHeight), gap: Double(gap)) {
+            Rectangle().fill(Color.red).frame(width: columnWidth, height: 2)
+                .overlay(alignment: .leading) { Circle().fill(Color.red).frame(width: 5, height: 5) }
+                .offset(x: gutter + gap + CGFloat(day - 1) * (columnWidth + gap), y: 42 + gap + CGFloat(y) - 1)
+                .allowsHitTesting(false)
+                .accessibilityLabel("当前时间 \(now.formatted(date: .omitted, time: .shortened))")
+        }
+    }
+
     private func cellLabel(_ entries: [TimetableEntry], day: Int, period: Int) -> String {
         let names = entries.map { entry in
             "\(entry.course.displayTitle)，\(entry.meeting.location)，\(entry.meeting.kind.title)，\(entry.isActive ? "本周有课" : "非本周课程")"
@@ -196,6 +231,7 @@ struct CourseTimetableGrid: View {
 
 private struct CoursePeriodCell: View {
     let entries: [TimetableEntry]
+    let isCurrent: Bool
     let onSelect: () -> Void
     private var active: Bool { entries.contains(where: \.isActive) }
     private var hasConflict: Bool { entries.filter(\.isActive).count > 1 }
@@ -229,8 +265,11 @@ private struct CoursePeriodCell: View {
                 }
                 .padding(4).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .foregroundStyle(active ? Color.primary : Color.secondary)
-                .background(active ? Color.teal.opacity(0.18) : Color.secondary.opacity(0.10),
+                .background(active ? Color.teal.opacity(isCurrent ? 0.48 : 0.18) : Color.secondary.opacity(0.10),
                             in: RoundedRectangle(cornerRadius: 6))
+                .overlay {
+                    if active && isCurrent { RoundedRectangle(cornerRadius: 6).stroke(Color.teal, lineWidth: 2) }
+                }
                 .opacity(active ? 1 : 0.4)
                 .clipped()
                 .contentShape(Rectangle())
@@ -252,59 +291,31 @@ private enum CourseListStyle: String, CaseIterable {
     case concise = "简洁", detailed = "详细"
 }
 
-private enum CourseListScope: String, CaseIterable {
-    case week = "本周", all = "全部"
-}
-
 private struct CourseCatalogView: View {
     let courses: [Course]
     let week: Int?
     let onSelect: (Course) -> Void
     @State private var style: CourseListStyle = .concise
-    @State private var scope: CourseListScope = .week
-    private var visibleCourses: [Course] {
-        scope == .all ? courses : courses.filter { course in
-            guard let week else { return false }
-            return course.meetings.contains { $0.isActive(in: week) }
-        }
-    }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Picker("课程信息", selection: $style) {
-                    ForEach(CourseListStyle.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }.pickerStyle(.segmented)
-                Picker("课程范围", selection: $scope) {
-                    ForEach(CourseListScope.allCases, id: \.self) { value in
-                        Text(value == .week ? (week.map { "第\($0)周" } ?? "本周") : value.rawValue).tag(value)
+            Picker("课程信息", selection: $style) {
+                ForEach(CourseListStyle.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }.pickerStyle(.segmented).padding(.horizontal).padding(.bottom, 8)
+            List {
+                Section {
+                    ForEach(courses) { course in
+                        Button { onSelect(course) } label: {
+                            if style == .concise {
+                                CourseCompactSummary(course: course, meetings: course.meetings)
+                            } else {
+                                CourseFullDetails(course: course, week: nil)
+                            }
+                        }.buttonStyle(.plain)
                     }
-                }.pickerStyle(.menu).fixedSize()
-            }.padding(.horizontal).padding(.bottom, 8)
-            if visibleCourses.isEmpty {
-                ContentUnavailableView(scope == .week ? "本周没有课程" : "还没有课程", systemImage: "books.vertical",
-                    description: Text(week == nil && scope == .week ? "当前不在学期内，可切换“全部”查看已有课程。" : "可切换范围查看全部课程，或导入并添加课程。"))
-            } else {
-                List {
-                    Section {
-                        ForEach(visibleCourses) { course in
-                            Button { onSelect(course) } label: {
-                                if style == .concise {
-                                    CourseCompactSummary(course: course, meetings: visibleMeetings(course))
-                                } else {
-                                    CourseFullDetails(course: course, week: week)
-                                }
-                            }.buttonStyle(.plain)
-                        }
-                    } header: { Text("\(scope == .all ? "全部" : "本周") · \(visibleCourses.count) 门课程") }
-                }.listStyle(.insetGrouped)
-            }
+                } header: { Text("所有课程 · \(courses.count) 门") }
+            }.listStyle(.insetGrouped)
         }
-    }
-
-    private func visibleMeetings(_ course: Course) -> [CourseMeeting] {
-        guard scope == .week, let week else { return course.meetings }
-        return course.meetings.filter { $0.isActive(in: week) }
     }
 }
 

@@ -111,3 +111,60 @@ enum TimetableEngine {
         }
     }
 }
+
+/// Course periods are the teaching intervals between the reminder plan's school breaks.
+/// Reminder selections, offsets and paused days do not change the school timetable.
+enum CourseClock {
+    struct Period: Equatable {
+        var start: Int
+        var end: Int
+    }
+    static let dayStart = 8 * 60
+    static let dayEnd = 21 * 60 + 30
+
+    static func periods(plan: ReminderPlan) -> [Period] {
+        let breaks = plan.slots.sorted { $0.minute < $1.minute }
+        var cursor = dayStart
+        var result: [Period] = []
+        for slot in breaks {
+            guard slot.duration > 0, slot.minute > cursor,
+                  slot.minute + slot.duration < dayEnd else { return [] }
+            result.append(Period(start: cursor, end: slot.minute))
+            cursor = slot.minute + slot.duration
+        }
+        result.append(Period(start: cursor, end: dayEnd))
+        return result
+    }
+
+    static func minute(on date: Date, calendar: Calendar = ScheduleEngine.calendar) -> Double {
+        Double(calendar.component(.hour, from: date) * 60 + calendar.component(.minute, from: date))
+            + Double(calendar.component(.second, from: date)) / 60
+    }
+
+    static func weekday(on date: Date, displayedWeek: Int, plan: ReminderPlan,
+                        calendar: Calendar = ScheduleEngine.calendar) -> Int? {
+        guard ScheduleEngine.weekNumber(on: date, plan: plan, calendar: calendar) == displayedWeek else { return nil }
+        return (calendar.component(.weekday, from: date) + 5) % 7 + 1
+    }
+
+    static func activePeriod(at minute: Double, periods: [Period]) -> Int? {
+        periods.firstIndex { minute >= Double($0.start) && minute < Double($0.end) }.map { $0 + 1 }
+    }
+
+    /// Row coordinates: class rows have height 1, breaks interpolate across the row gaps.
+    static func position(at minute: Double, periods: [Period], rowHeight: Double, gap: Double) -> Double? {
+        guard !periods.isEmpty, minute >= Double(dayStart), minute <= Double(dayEnd) else { return nil }
+        for (index, period) in periods.enumerated() {
+            let top = Double(index) * (rowHeight + gap)
+            if minute <= Double(period.end) {
+                let fraction = (minute - Double(period.start)) / Double(period.end - period.start)
+                return top + max(0, min(1, fraction)) * rowHeight
+            }
+            if index + 1 < periods.count, minute < Double(periods[index + 1].start) {
+                let fraction = (minute - Double(period.end)) / Double(periods[index + 1].start - period.end)
+                return top + rowHeight + fraction * gap
+            }
+        }
+        return nil
+    }
+}
