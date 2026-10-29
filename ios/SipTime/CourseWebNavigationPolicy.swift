@@ -3,6 +3,8 @@ import Foundation
 /// Navigation rules shared by the address bar, normal frames and sign-in popups.
 /// Legacy course/portal callbacks use HTTP; the IAAA password page remains HTTPS.
 enum CourseWebNavigationPolicy {
+    static let defaultSchoolAddress = "http://elective.pku.edu.cn/"
+
     enum Decision: Equatable {
         case allow
         case block(String)

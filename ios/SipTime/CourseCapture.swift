@@ -221,7 +221,7 @@ struct CourseWebDialog: Identifiable {
 
 @MainActor
 final class CourseWebSession: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
-    @Published var address = ""
+    @Published var address = CourseWebNavigationPolicy.defaultSchoolAddress
     @Published var error: String?
     @Published var isLoading = false
     @Published var isCapturing = false

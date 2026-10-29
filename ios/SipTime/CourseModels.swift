@@ -7,6 +7,30 @@ struct Course: Codable, Identifiable, Equatable {
     var number = ""
     var teacher = ""
     var meetings: [CourseMeeting] = []
+    /// Personal display name; the imported title remains available in course details.
+    var remark = ""
+
+    var displayTitle: String {
+        let personalTitle = remark.trimmingCharacters(in: .whitespacesAndNewlines)
+        return personalTitle.isEmpty ? title : personalTitle
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, number, teacher, meetings, remark
+    }
+}
+
+extension Course {
+    /// Older state.json files have no personal display name; retain every original field.
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        title = try values.decode(String.self, forKey: .title)
+        number = try values.decode(String.self, forKey: .number)
+        teacher = try values.decode(String.self, forKey: .teacher)
+        meetings = try values.decode([CourseMeeting].self, forKey: .meetings)
+        remark = try values.decodeIfPresent(String.self, forKey: .remark) ?? ""
+    }
 }
 
 struct CourseMeeting: Codable, Identifiable, Equatable {
@@ -55,6 +79,10 @@ struct CourseTimetable: Codable, Equatable {
             if let match {
                 var replacement = course
                 replacement.id = updated.courses[match].id
+                // Reimport updates school data while preserving the user's personal label.
+                if course.remark.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    replacement.remark = updated.courses[match].remark
+                }
                 updated.courses[match] = replacement
             } else { updated.courses.append(course) }
         }

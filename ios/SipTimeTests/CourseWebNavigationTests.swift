@@ -6,6 +6,13 @@ import XCTest
 #endif
 
 final class CourseWebNavigationTests: XCTestCase {
+    func testDefaultSchoolEntryIsReadyToOpenWithoutTyping() throws {
+        let entry = try XCTUnwrap(CourseWebNavigationPolicy.addressURL(CourseWebNavigationPolicy.defaultSchoolAddress))
+        XCTAssertEqual(entry.host, "elective.pku.edu.cn")
+        XCTAssertEqual(entry.scheme, "http")
+        XCTAssertEqual(CourseWebNavigationPolicy.decision(for: entry, isMainFrame: true, isNewWindow: false), .allow)
+    }
+
     private func decision(_ value: String, main: Bool = true, popup: Bool = false) -> CourseWebNavigationPolicy.Decision {
         CourseWebNavigationPolicy.decision(for: URL(string: value)!, isMainFrame: main, isNewWindow: popup)
     }

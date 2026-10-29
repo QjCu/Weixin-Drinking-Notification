@@ -23,10 +23,10 @@ jobs:
       - name: Build iPhone app for simulator
         run: xcodebuild -project SipTime.xcodeproj -scheme SipTime -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
         working-directory: ios
-      - name: Test school login window handling
+      - name: Test login windows and compact timetable
         timeout-minutes: 12
         run: |
           course_simulator_id=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; groups=json.load(sys.stdin)["devices"]; print(next(d["udid"] for runtime,devices in groups.items() if "iOS" in runtime for d in devices if d["name"].startswith("iPhone")))')
           xcrun simctl bootstatus "$course_simulator_id" -b
-          xcodebuild -project SipTime.xcodeproj -scheme SipTime -destination "platform=iOS Simulator,id=$course_simulator_id" -parallel-testing-enabled NO -only-testing:SipTimeTests/CourseWebSessionTests CODE_SIGNING_ALLOWED=NO test
+          xcodebuild -project SipTime.xcodeproj -scheme SipTime -destination "platform=iOS Simulator,id=$course_simulator_id" -parallel-testing-enabled NO -only-testing:SipTimeTests/CourseWebSessionTests -only-testing:SipTimeTests/CourseTimetableLayoutTests CODE_SIGNING_ALLOWED=NO test
         working-directory: ios
