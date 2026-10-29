@@ -89,3 +89,5 @@ GitHub 分支：`version2`，基于 `codex/siptime-mvp` 创建。后续需求继
 - 普通版编译时不执行小组件共享、刷新或显示同步状态；现有课表、提醒、账号与本地数据保留。
 - 小组件源码、共享模型、测试和签名配置保留在仓库，未来可通过 `xcodegen generate --spec project-widgets.yml` 明确启用。
 - CI 分别检查普通版无扩展/共享签名依赖、编译普通版并运行现有回归，然后生成和编译可选小组件版。
+
+验证：[6861e4c 的检查](https://github.com/QjCu/Weixin-Drinking-Notification/actions/runs/40866666960) 通过 55 项核心测试、4 项模拟器回归测试和服务端检查；默认普通版与可选小组件版分别编译成功。CI 确认普通版工程无 `CODE_SIGN_ENTITLEMENTS`、无嵌入 `.appex`；可选版实际带 `SIPTIME_WIDGETS` 编译标志，保留同步功能代码。
