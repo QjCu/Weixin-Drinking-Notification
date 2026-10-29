@@ -48,7 +48,7 @@ struct CourseWidgetView: View {
                     weekGrid(snapshot)
                 } else if family == .systemSmall {
                     if let next = CourseWidgetEngine.upcoming(after: entry.date, snapshot: snapshot) { lesson(next, compact: false) }
-                    else { empty("近期没有课程", detail: "未来七天暂无安排") }
+                    else { empty("没有后续课程", detail: "本学期暂无后续安排") }
                 } else {
                     let remaining = today.filter { $0.end > entry.date }
                     if remaining.isEmpty {

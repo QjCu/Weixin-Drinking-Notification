@@ -42,8 +42,9 @@ enum CourseWidgetEngine {
 
     static func upcoming(after date: Date, snapshot: CourseWidgetSnapshot,
                          calendar: Calendar = ScheduleEngine.calendar) -> WidgetLesson? {
-        for offset in 0...7 {
-            guard let day = calendar.date(byAdding: .day, value: offset, to: date) else { continue }
+        let searchStart = max(date, snapshot.plan.termStart.date(in: calendar))
+        for offset in 0...364 {
+            guard let day = calendar.date(byAdding: .day, value: offset, to: searchStart) else { continue }
             if let lesson = lessons(on: day, snapshot: snapshot, calendar: calendar).first(where: { $0.end > date }) { return lesson }
         }
         return nil

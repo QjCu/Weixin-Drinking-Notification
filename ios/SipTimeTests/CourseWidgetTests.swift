@@ -36,6 +36,13 @@ final class CourseWidgetTests: XCTestCase {
         XCTAssertEqual(CourseWidgetEngine.upcoming(after: date(25, 22), snapshot: s, calendar: cal)?.course.displayTitle, "数学")
         XCTAssertEqual(CourseWidgetEngine.upcoming(after: date(26, 10), snapshot: s, calendar: cal)?.course.title, "双周课")
     }
+    func testNextClassCanSkipAnEmptyEvenWeek() throws {
+        var s = snapshot()
+        s.timetable.courses.removeLast()
+        let next = try XCTUnwrap(CourseWidgetEngine.upcoming(after: date(26, 10), snapshot: s, calendar: cal))
+        XCTAssertEqual(cal.dateComponents([.day], from: date(26), to: cal.startOfDay(for: next.start)).day, 14)
+        XCTAssertEqual(next.course.displayTitle, "数学")
+    }
     func testSnapshotDoesNotContainAccountsOrFriendNotes() throws {
         let encoded = try JSONEncoder().encode(snapshot())
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
