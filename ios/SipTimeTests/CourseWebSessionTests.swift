@@ -14,7 +14,7 @@ final class CourseWebSessionTests: XCTestCase {
         defer { session.shutdown(); window.isHidden = true }
         try await loadFixture(root, body: "<p>Login fixture</p>")
 
-        _ = try await root.evaluateJavaScript("window.loginPopup = window.open('about:blank', 'login'); true;")
+        _ = try await root.evaluateJavaScript("window.loginPopup = window.open(); true;")
         try await waitUntil("Login popup was not created") { session.pages.count == 2 }
         let popup = session.webView
         attach(popup, to: window)

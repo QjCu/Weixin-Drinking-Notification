@@ -401,7 +401,9 @@ final class CourseWebSession: NSObject, ObservableObject, WKNavigationDelegate, 
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard !isShuttingDown, let url = navigationAction.request.url else {
+        let requestedURL = navigationAction.request.url ??
+            (navigationAction.targetFrame == nil ? URL(string: "about:blank") : nil)
+        guard !isShuttingDown, let url = requestedURL else {
             decisionHandler(.cancel)
             return
         }
