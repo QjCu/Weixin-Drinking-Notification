@@ -3,6 +3,7 @@ import PhotosUI
 import Vision
 import ImageIO
 import WebKit
+import UIKit
 
 /// PhotosPicker grants access only to the selected image. Recognition runs on-device.
 struct ScreenshotImportButton: View {
@@ -106,7 +107,7 @@ struct CourseWebImportView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 HStack {
-                    TextField("学校教务网站 HTTPS 地址", text: $browser.address)
+                    TextField("学校教务网站地址", text: $browser.address)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
@@ -115,17 +116,25 @@ struct CourseWebImportView: View {
                     Button("前往") { browser.openAddress() }
                 }
                 .padding()
-                Text("登录后打开选课结果页面，再点“识别当前页面”。登录和识别均在本机进行，网页会话不保存到磁盘。")
+                Text("登录后打开选课结果页面，再点“识别当前页面”。支持北大旧版选课网及门户的 HTTP 跳转；IAAA 登录请使用 HTTPS。网页会话仅保存在本机内存中。")
                     .font(.caption).foregroundStyle(.secondary)
                     .padding(.horizontal).padding(.bottom, 8)
+                if browser.pages.count > 1 {
+                    HStack {
+                        Label("网页已打开新窗口", systemImage: "rectangle.on.rectangle")
+                        Spacer()
+                        Button("返回上一窗口") { browser.closePopup() }
+                    }
+                    .font(.caption).padding(.horizontal).padding(.bottom, 8)
+                }
                 if let error = browser.error {
                     Text(error).font(.caption).foregroundStyle(.red)
                         .padding(.horizontal).padding(.bottom, 8)
                 }
                 if browser.isLoading { ProgressView().frame(maxWidth: .infinity).padding(.bottom, 4) }
-                CourseWebContent(webView: browser.webView)
+                CourseWebContent(pages: browser.pages)
                 HStack(spacing: 28) {
-                    Button { browser.webView.goBack() } label: { Image(systemName: "chevron.left") }
+                    Button { browser.goBack() } label: { Image(systemName: "chevron.left") }
                         .disabled(!browser.canGoBack).accessibilityLabel("后退")
                     Button { browser.webView.goForward() } label: { Image(systemName: "chevron.right") }
                         .disabled(!browser.canGoForward).accessibilityLabel("前进")
@@ -153,54 +162,176 @@ struct CourseWebImportView: View {
                     .disabled(browser.isLoading || browser.isCapturing || browser.webView.url == nil)
                 }
             }
+            .alert(browser.dialog?.title ?? "网页提示", isPresented: dialogPresentation) {
+                if browser.dialog?.kind == .prompt {
+                    TextField("输入内容", text: $browser.promptText)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                }
+                if browser.dialog?.kind != .alert {
+                    Button("取消", role: .cancel) { browser.answerDialog(accepted: false) }
+                }
+                Button("确定") { browser.answerDialog(accepted: true) }
+            } message: {
+                Text(browser.dialog?.message ?? "")
+            }
+            .onDisappear { browser.shutdown() }
+        }
+    }
+
+    private var dialogPresentation: Binding<Bool> {
+        let presentedID = browser.dialog?.id
+        return Binding(
+            get: { presentedID != nil && browser.dialog?.id == presentedID },
+            set: { if !$0 { browser.dismissDialog(id: presentedID) } }
+        )
+    }
+}
+
+/// Keep opener windows alive in the same view hierarchy while showing the newest popup.
+/// Reusing only one WKWebView would break window.opener, postMessage and window.close.
+private struct CourseWebContent: UIViewRepresentable {
+    let pages: [WKWebView]
+    func makeUIView(context: Context) -> UIView { UIView() }
+    func updateUIView(_ container: UIView, context: Context) {
+        let identifiers = Set(pages.map(ObjectIdentifier.init))
+        for child in container.subviews where !identifiers.contains(ObjectIdentifier(child)) {
+            child.removeFromSuperview()
+        }
+        for page in pages {
+            if page.superview !== container {
+                page.frame = container.bounds
+                page.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                container.addSubview(page)
+            }
+            page.isHidden = page !== pages.last
         }
     }
 }
 
-private struct CourseWebContent: UIViewRepresentable {
-    let webView: WKWebView
-    func makeUIView(context: Context) -> WKWebView { webView }
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+struct CourseWebDialog: Identifiable {
+    enum Kind: Equatable { case alert, confirm, prompt }
+    let id = UUID()
+    let webViewID: ObjectIdentifier
+    let kind: Kind
+    let title: String
+    let message: String
+    let defaultText: String
+    let completion: (Bool, String?) -> Void
 }
 
 @MainActor
-private final class CourseWebSession: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
+final class CourseWebSession: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
     @Published var address = ""
     @Published var error: String?
     @Published var isLoading = false
     @Published var isCapturing = false
     @Published var canGoBack = false
     @Published var canGoForward = false
-    let webView: WKWebView
+    @Published private(set) var pages: [WKWebView]
+    @Published private(set) var dialog: CourseWebDialog?
+    @Published var promptText = ""
+    var webView: WKWebView { pages.last! }
+    private var queuedDialogs: [CourseWebDialog] = []
+    private var observations: [ObjectIdentifier: [NSKeyValueObservation]] = [:]
+    private var isShuttingDown = false
+    private var isDismissingDialog = false
+    private var displayedAddress = ""
+    private var displayedURL: URL?
 
     override init() {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
-        webView = WKWebView(frame: .zero, configuration: configuration)
+        // SSO sometimes opens its callback window after an asynchronous login request.
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+        let root = WKWebView(frame: .zero, configuration: configuration)
+        pages = [root]
         super.init()
-        webView.navigationDelegate = self
-        webView.uiDelegate = self
-        webView.allowsBackForwardNavigationGestures = true
+        configure(root)
+    }
+
+    private func configure(_ page: WKWebView) {
+        page.navigationDelegate = self
+        page.uiDelegate = self
+        page.allowsBackForwardNavigationGestures = true
+        // JS history and opener-driven redirects may update URL/history without didFinish.
+        observations[ObjectIdentifier(page)] = [
+            page.observe(\.url, options: [.new]) { [weak self, weak page] _, _ in
+                Task { @MainActor in self?.updateNavigation(ifActive: page) }
+            },
+            page.observe(\.isLoading, options: [.new]) { [weak self, weak page] _, _ in
+                Task { @MainActor in self?.updateNavigation(ifActive: page) }
+            },
+            page.observe(\.canGoBack, options: [.new]) { [weak self, weak page] _, _ in
+                Task { @MainActor in self?.updateNavigation(ifActive: page) }
+            },
+            page.observe(\.canGoForward, options: [.new]) { [weak self, weak page] _, _ in
+                Task { @MainActor in self?.updateNavigation(ifActive: page) }
+            }
+        ]
     }
 
     func openAddress() {
-        let entered = address.trimmingCharacters(in: .whitespacesAndNewlines)
-        let value = entered.contains("://") ? entered : "https://\(entered)"
-        guard let url = URL(string: value), url.scheme?.lowercased() == "https",
-              let host = url.host, !host.isEmpty, url.user == nil, url.password == nil else {
-            error = "请输入有效的 HTTPS 学校网页地址。"
+        // The visible field omits SSO tickets, but re-opening that unchanged field must retain
+        // the real URL's appID/redirectUrl/ticket parameters rather than break authentication.
+        let target = address == displayedAddress ? displayedURL : CourseWebNavigationPolicy.addressURL(address)
+        guard let url = target ?? CourseWebNavigationPolicy.addressURL(address) else {
+            error = "请输入有效的 HTTPS 学校网址；北大旧版选课网 elective.pku.edu.cn 和门户 portal.pku.edu.cn 也支持 HTTP。"
             return
         }
         error = nil
         webView.load(URLRequest(url: url))
     }
 
+    func goBack() {
+        if webView.canGoBack { webView.goBack() }
+        else { closePopup() }
+    }
+
+    func closePopup() {
+        guard pages.count > 1 else { return }
+        removePopup(webView)
+    }
+
+    private func removePopup(_ page: WKWebView) {
+        guard let index = pages.firstIndex(where: { $0 === page }), index > 0 else { return }
+        let removed = Array(pages[index...])
+        let identifiers = Set(removed.map(ObjectIdentifier.init))
+        pages.removeSubrange(index...)
+        cancelDialogs(for: identifiers)
+        for child in removed {
+            child.stopLoading()
+            child.navigationDelegate = nil
+            child.uiDelegate = nil
+            observations.removeValue(forKey: ObjectIdentifier(child))
+        }
+        error = nil
+        updateNavigation()
+    }
+
+    func shutdown() {
+        guard !isShuttingDown else { return }
+        isShuttingDown = true
+        isCapturing = false
+        isLoading = false
+        cancelDialogs(for: Set(pages.map(ObjectIdentifier.init)))
+        for page in pages {
+            page.stopLoading()
+            page.navigationDelegate = nil
+            page.uiDelegate = nil
+        }
+        observations.removeAll()
+        let store = pages[0].configuration.websiteDataStore
+        store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) {}
+    }
+
     func capture() async -> String? {
+        guard !isShuttingDown else { return nil }
+        let source = webView
         isCapturing = true
         error = nil
-        defer { isCapturing = false }
+        defer { if !isShuttingDown { isCapturing = false } }
         do {
-            // Strip input values and scripts. Only course page structure is needed by the parser.
+            // Strip inputs and scripts; credentials are never sent to the parser/server.
             let script = """
             (() => {
               const collect = (doc, depth) => {
@@ -221,9 +352,12 @@ private final class CourseWebSession: NSObject, ObservableObject, WKNavigationDe
               return collect(document, 0);
             })()
             """
-            guard let html = try await webView.evaluateJavaScript(script) as? String,
-                  !html.isEmpty else {
+            guard let html = try await source.evaluateJavaScript(script) as? String, !html.isEmpty else {
                 throw CourseCaptureError.message("当前页面没有可读取的内容，请先打开课程结果表。")
+            }
+            guard !isShuttingDown else { return nil }
+            guard source === webView else {
+                throw CourseCaptureError.message("网页窗口已切换，请重新识别当前页面。")
             }
             guard html.utf8.count <= 5 * 1024 * 1024 else {
                 throw CourseCaptureError.message("网页内容过大，请打开仅包含课程结果的页面，或改用截图导入。")
@@ -236,75 +370,195 @@ private final class CourseWebSession: NSObject, ObservableObject, WKNavigationDe
             }
             return html
         } catch {
-            if error is CourseCaptureError {
-                self.error = error.localizedDescription
-            } else {
-                self.error = "读取页面失败：\(error.localizedDescription) 如页面使用内嵌框架，可直接打开课表所在页面或改用截图。"
-            }
+            guard !isShuttingDown else { return nil }
+            if error is CourseCaptureError { self.error = error.localizedDescription }
+            else { self.error = "读取页面失败，请等待课程页面加载完成后重试，或使用截图导入。" }
             return nil
         }
     }
 
+    private func updateNavigation(ifActive page: WKWebView?) {
+        guard let page, page === webView, !isShuttingDown else { return }
+        updateNavigation()
+    }
+
     private func updateNavigation() {
-        canGoBack = webView.canGoBack
+        canGoBack = webView.canGoBack || pages.count > 1
         canGoForward = webView.canGoForward
-        if let url = webView.url { address = url.absoluteString }
+        isLoading = webView.isLoading
+        if let url = webView.url, let host = url.host, !host.isEmpty,
+           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            // Callback queries can contain one-time SSO tickets; keep those out of displayed errors/screenshots.
+            components.query = nil
+            components.fragment = nil
+            components.user = nil
+            components.password = nil
+            address = components.string ?? CourseWebNavigationPolicy.diagnosticTarget(url)
+            displayedAddress = address
+            displayedURL = url
+        }
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        // Some sign-in pages build a blank child frame before filling it locally.
-        if navigationAction.request.url?.absoluteString == "about:blank",
-           navigationAction.targetFrame?.isMainFrame == false {
-            decisionHandler(.allow)
-            return
-        }
-        guard let url = navigationAction.request.url,
-              url.scheme?.lowercased() == "https", url.user == nil, url.password == nil else {
-            error = "此导入窗口仅支持 HTTPS 网页；也可以使用截图或粘贴内容导入。"
-            isLoading = false
+        guard !isShuttingDown, let url = navigationAction.request.url else {
             decisionHandler(.cancel)
             return
         }
-        if navigationAction.targetFrame == nil {
-            decisionHandler(.cancel)
-            webView.load(navigationAction.request)
-        } else {
+        // A newly created popup may first navigate its main frame to about:blank.
+        let isPopupBlank = webView !== pages.first && ["about:blank", "about:srcdoc"].contains(url.absoluteString.lowercased())
+        switch CourseWebNavigationPolicy.decision(for: url,
+                isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
+                isNewWindow: navigationAction.targetFrame == nil || isPopupBlank) {
+        case .allow:
+            // Let WKUIDelegate create real popup contexts. Loading into the opener breaks SSO callbacks.
             decisionHandler(.allow)
+        case .block(let reason):
+            error = reason
+            decisionHandler(.cancel)
+            updateNavigation(ifActive: webView)
         }
     }
 
-    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        isLoading = true
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        guard !isShuttingDown else { return nil }
+        let url = navigationAction.request.url ?? URL(string: "about:blank")!
+        switch CourseWebNavigationPolicy.decision(for: url, isMainFrame: true, isNewWindow: true) {
+        case .block(let reason): error = reason; return nil
+        case .allow: break
+        }
+        guard pages.count < 6 else {
+            error = "网页登录窗口过多，请返回上一窗口后重试。"
+            return nil
+        }
+        // Use WebKit's supplied configuration unchanged. It preserves related-window opener,
+        // process pool and the parent's ephemeral cookie store; a fresh config would break SSO.
+        let popup = WKWebView(frame: .zero, configuration: configuration)
+        configure(popup)
+        pages.append(popup)
         error = nil
         updateNavigation()
+        return popup
+    }
+
+    func webViewDidClose(_ webView: WKWebView) { removePopup(webView) }
+
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        if webView === self.webView { error = nil; updateNavigation() }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        isLoading = false
-        updateNavigation()
+        updateNavigation(ifActive: webView)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        showNavigationError(error)
+        showNavigationError(error, in: webView)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        showNavigationError(error)
+        showNavigationError(error, in: webView)
     }
 
-    private func showNavigationError(_ error: Error) {
-        isLoading = false
-        updateNavigation()
-        if (error as NSError).code != NSURLErrorCancelled {
-            self.error = "无法打开网页：\(error.localizedDescription)"
+    private func showNavigationError(_ error: Error, in page: WKWebView) {
+        updateNavigation(ifActive: page)
+        let failure = error as NSError
+        guard failure.code != NSURLErrorCancelled, !isShuttingDown else { return }
+        let failingURL = failure.userInfo[NSURLErrorFailingURLErrorKey] as? URL ?? page.url
+        let target = failingURL.map(CourseWebNavigationPolicy.diagnosticTarget) ?? "学校网页"
+        let description: String
+        switch failure.code {
+        case NSURLErrorNotConnectedToInternet: description = "当前没有网络连接"
+        case NSURLErrorTimedOut: description = "连接超时，请检查校园网或稍后重试"
+        case NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost: description = "无法连接学校服务器"
+        case NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateUntrusted,
+             NSURLErrorServerCertificateHasBadDate, NSURLErrorServerCertificateHasUnknownRoot,
+             NSURLErrorServerCertificateNotYetValid: description = "HTTPS 安全连接失败，请确认学校网址与系统日期"
+        case NSURLErrorAppTransportSecurityRequiresSecureConnection: description = "系统阻止了此 HTTP 连接，请使用学校的 HTTPS 入口"
+        default: description = "网页加载失败（错误码 \(failure.code)），请重试或使用截图导入"
         }
+        // NSError.localizedDescription can include full callback URLs, including tickets. Do not display it.
+        self.error = "\(description)（\(target)）。"
+    }
+
+    private func enqueueDialog(in page: WKWebView, kind: CourseWebDialog.Kind, message: String,
+                               defaultText: String = "", completion: @escaping (Bool, String?) -> Void) {
+        guard !isShuttingDown, pages.contains(where: { $0 === page }) else {
+            completion(false, nil)
+            return
+        }
+        let origin = page.url.map(CourseWebNavigationPolicy.diagnosticTarget) ?? "学校网页"
+        queuedDialogs.append(CourseWebDialog(webViewID: ObjectIdentifier(page), kind: kind,
+            title: "网页提示 · \(origin)", message: String(message.prefix(2000)),
+            defaultText: String(defaultText.prefix(2000)), completion: completion))
+        showNextDialog()
+    }
+
+    private func showNextDialog() {
+        guard dialog == nil, !queuedDialogs.isEmpty, !isShuttingDown, !isDismissingDialog else { return }
+        let next = queuedDialogs.removeFirst()
+        promptText = next.defaultText
+        dialog = next
+    }
+
+    func answerDialog(accepted: Bool) {
+        guard let current = dialog else { return }
+        let text = promptText
+        dialog = nil
+        promptText = ""
+        isDismissingDialog = true
+        current.completion(accepted, accepted ? text : nil)
+        resumeDialogsAfterDismissal()
+    }
+
+    func dismissDialog(id: UUID?) {
+        guard let id else { return }
+        // SwiftUI may reset an old presentation binding after its button action completed.
+        // Defer and match the original ID so it cannot cancel the following queued dialog.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.dialog?.id == id else { return }
+            self.answerDialog(accepted: false)
+        }
+    }
+
+    private func resumeDialogsAfterDismissal() {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard let self, !self.isShuttingDown else { return }
+            self.isDismissingDialog = false
+            self.showNextDialog()
+        }
+    }
+
+    private func cancelDialogs(for identifiers: Set<ObjectIdentifier>) {
+        var cancelled = queuedDialogs.filter { identifiers.contains($0.webViewID) }
+        queuedDialogs.removeAll { identifiers.contains($0.webViewID) }
+        if let current = dialog, identifiers.contains(current.webViewID) {
+            dialog = nil
+            promptText = ""
+            isDismissingDialog = true
+            cancelled.append(current)
+            resumeDialogsAfterDismissal()
+        }
+        for item in cancelled { item.completion(false, nil) }
+        showNextDialog()
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
-        // Preserve useful school login validation messages instead of silently discarding alerts.
-        error = message
-        completionHandler()
+        enqueueDialog(in: webView, kind: .alert, message: message) { _, _ in completionHandler() }
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        enqueueDialog(in: webView, kind: .confirm, message: message) { accepted, _ in completionHandler(accepted) }
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String,
+                 defaultText: String?, initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping (String?) -> Void) {
+        enqueueDialog(in: webView, kind: .prompt, message: prompt, defaultText: defaultText ?? "") {
+            accepted, text in completionHandler(accepted ? text : nil)
+        }
     }
 }
