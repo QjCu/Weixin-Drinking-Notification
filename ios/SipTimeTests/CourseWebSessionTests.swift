@@ -26,7 +26,9 @@ final class CourseWebSessionTests: XCTestCase {
         XCTAssertEqual(hasOpener, true)
 
         // An authentication popup must retain its real window.opener and be able to close itself.
-        _ = try? await popup.evaluateJavaScript("window.opener.openerResult = 'connected'; window.close(); true;")
+        // Closing a JS context can discard that context's evaluation completion. Observe
+        // the delegate effect with a deadline instead of awaiting a callback from a closed page.
+        popup.evaluateJavaScript("window.opener.openerResult = 'connected'; window.close();", completionHandler: nil)
         try await waitUntil("Closed popup did not return to its parent") { session.pages.count == 1 }
         XCTAssertTrue(session.webView === root)
         let marker = try await root.evaluateJavaScript("window.openerResult") as? String
