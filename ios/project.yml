@@ -5,6 +5,8 @@ options:
     iOS: "17.0"
 settings:
   base:
+    SIPTIME_APP_GROUP: group.com.example.SipTime
+    SIPTIME_BUNDLE_ID: com.example.SipTime
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1"
     MARKETING_VERSION: "0.1.0"
@@ -17,13 +19,19 @@ targets:
     sources:
       - path: SipTime
         excludes: [Info.plist, Info-Debug.plist]
+      - path: Shared
+        excludes: [AppGroups.entitlements]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.SipTime
+        PRODUCT_BUNDLE_IDENTIFIER: $(SIPTIME_BUNDLE_ID)
         INFOPLIST_FILE: SipTime/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Shared/AppGroups.entitlements
       configs:
         Debug:
           INFOPLIST_FILE: SipTime/Info-Debug.plist
+    dependencies:
+      - target: SipTimeWidgets
+        embed: true
     scheme:
       testTargets: [SipTimeTests]
   SipTimeTests:
@@ -35,3 +43,21 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+
+  SipTimeWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SipTimeWidgets
+        excludes: [Info.plist]
+      - path: Shared
+        excludes: [AppGroups.entitlements]
+      - path: SipTime/Models.swift
+      - path: SipTime/CourseModels.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(SIPTIME_BUNDLE_ID).widgets
+        INFOPLIST_FILE: SipTimeWidgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Shared/AppGroups.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES

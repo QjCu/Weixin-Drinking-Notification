@@ -6,11 +6,11 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [.library(name: "SipTimeCore", targets: ["SipTimeCore"])],
     targets: [
-        .target(name: "SipTimeCore", path: "SipTime",
-                exclude: ["APIClient.swift", "AppStore.swift", "FriendView.swift", "NotificationScheduler.swift",
-                          "PlanView.swift", "SipTimeApp.swift", "CourseTimetableView.swift", "CourseImportView.swift",
-                          "CourseCapture.swift", "Info.plist", "Info-Debug.plist"],
-                sources: ["Models.swift", "CourseModels.swift", "CourseImportParser.swift", "CourseWebNavigationPolicy.swift"]),
+        .target(name: "SipTimeCore", path: ".",
+                exclude: ["SipTimeWidgets", "SipTimeTests", "Shared/AppGroups.entitlements", "project.yml", "Package.swift", "SipTime/APIClient.swift", "SipTime/AppStore.swift", "SipTime/FriendView.swift", "SipTime/NotificationScheduler.swift",
+                          "SipTime/PlanView.swift", "SipTime/SipTimeApp.swift", "SipTime/CourseTimetableView.swift", "SipTime/CourseImportView.swift",
+                          "SipTime/CourseCapture.swift", "SipTime/Info.plist", "SipTime/Info-Debug.plist"],
+                sources: ["SipTime/Models.swift", "SipTime/CourseModels.swift", "SipTime/CourseImportParser.swift", "SipTime/CourseWebNavigationPolicy.swift", "Shared/WidgetData.swift"]),
         .testTarget(name: "SipTimeCoreTests", dependencies: ["SipTimeCore"], path: "SipTimeTests")
     ]
 )

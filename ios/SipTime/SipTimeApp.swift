@@ -11,15 +11,19 @@ struct SipTimeApp: App {
 }
 
 struct RootView: View {
+    @State private var selectedTab = 0
     @EnvironmentObject private var store: AppStore
     @Environment(\.scenePhase) private var phase
     private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     var body: some View {
-        TabView {
-            TodayView().tabItem { Label("今天", systemImage: "drop") }
-            CourseTimetableView().tabItem { Label("课表", systemImage: "tablecells") }
-            PlanView().tabItem { Label("提醒计划", systemImage: "calendar") }
-            FriendView().tabItem { Label("好友", systemImage: "bubble.left.and.bubble.right") }
+        TabView(selection: $selectedTab) {
+            TodayView().tag(0).tabItem { Label("今天", systemImage: "drop") }
+            CourseTimetableView().tag(1).tabItem { Label("课表", systemImage: "tablecells") }
+            PlanView().tag(2).tabItem { Label("提醒计划", systemImage: "calendar") }
+            FriendView().tag(3).tabItem { Label("好友", systemImage: "bubble.left.and.bubble.right") }
+        }
+        .onOpenURL { url in
+            if url.scheme == "siptime", url.host == "timetable" { selectedTab = 1 }
         }
         .disabled(store.isBusy)
         .overlay(alignment: .top) {
@@ -74,6 +78,7 @@ struct TodayView: View {
                 } header: { Text("提醒状态") } footer: {
                     Text("打开 App 会补充最多 60 条本地通知。超过已安排日期后，需要再次打开补充。专注模式或通知摘要可能影响显示时间。")
                 }
+                Section("桌面课表小组件") { Text(store.widgetStatus).font(.footnote) }
                 Section("今天接下来的提醒") {
                     if today.isEmpty { Text("今天暂无后续提醒").foregroundStyle(.secondary) }
                     ForEach(today, id: \.self) { date in
