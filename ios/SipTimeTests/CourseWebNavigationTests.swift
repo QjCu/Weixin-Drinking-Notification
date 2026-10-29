@@ -53,10 +53,13 @@ final class CourseWebNavigationTests: XCTestCase {
     }
 
     func testWindowOpenEmptyRequestURLBecomesBlankOnlyInNewWindowContext() throws {
-        let empty = try XCTUnwrap(URL(string: ""))
-        XCTAssertEqual(CourseWebNavigationPolicy.navigationURL(empty, isNewWindow: true)?.absoluteString, "about:blank")
+        // Darwin may reject the empty string at URL initialization while swift-corelibs
+        // preserves it. Both representations reach the same WebKit blank-window rule.
+        if let empty = URL(string: "") {
+            XCTAssertEqual(CourseWebNavigationPolicy.navigationURL(empty, isNewWindow: true)?.absoluteString, "about:blank")
+            XCTAssertEqual(CourseWebNavigationPolicy.navigationURL(empty, isNewWindow: false), empty)
+        }
         XCTAssertEqual(CourseWebNavigationPolicy.navigationURL(nil, isNewWindow: true)?.absoluteString, "about:blank")
-        XCTAssertEqual(CourseWebNavigationPolicy.navigationURL(empty, isNewWindow: false), empty)
         XCTAssertNil(CourseWebNavigationPolicy.navigationURL(nil, isNewWindow: false))
         let callback = URL(string: "http://elective.pku.edu.cn/ssoLogin.do?token=example")!
         XCTAssertEqual(CourseWebNavigationPolicy.navigationURL(callback, isNewWindow: true), callback)
