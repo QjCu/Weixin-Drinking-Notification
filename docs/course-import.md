@@ -89,4 +89,6 @@ protocol SchoolCourseImportAdapter {
 
 已在 Linux Swift 6.0.3 执行 28 项核心 XCTest，覆盖导入解析、按周显示、重复导入合并、旧状态兼容及原有提醒算法；Swift 语法检查已通过。[代码提交 e504f62 的 GitHub Actions](https://github.com/QjCu/Weixin-Drinking-Notification/actions/runs/40114222228) 也通过了 28 项 Swift 测试、iPhone 模拟器编译和服务端检查。真实图片 Vision 识别、学校网页登录、界面操作与真机通知仍未验收。
 
+第 003 次修改新增 8 项导航策略测试，核心测试共 36 项通过；[最终修复代码 40b641e 的检查](https://github.com/QjCu/Weixin-Drinking-Notification/actions/runs/40849008391) 还实际通过了 3 项 iPhone 模拟器 WebKit 运行测试及 App 编译。WebKit 用本地 HTML 模拟无参数打开空白登录窗口、原窗口关联、关闭返回和确认框；它不能替代真实学校账户登录验收。
+
 在 Mac 验收时，应使用自己的完整选课截图和网页登录结果，对照课程数、每门课所有安排、单双周及学期日期；再切换单双周检查淡化和交替课程显示。文字解析测试不能证明图片 OCR 或实际学校登录已经成功。

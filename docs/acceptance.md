@@ -4,7 +4,7 @@
 
 ## 编译与界面
 
-- Mac 执行 `swift test`，通过 28 项核心测试（18 项课程导入/显示、10 项提醒算法）。
+- Mac 执行 `swift test`，通过 36 项核心测试（18 项课程导入/显示、10 项提醒算法、8 项网页登录导航策略）。
 - XcodeGen 生成工程，模拟器和真机 Debug 编译启动。
 - Release 可编译且拒绝 HTTP 服务端地址。
 - 深色模式、大字体可阅读，课间表横向滑动可见周末。
@@ -44,6 +44,7 @@
 - 预览中修改、删除、补充课程，取消导入保留原课表；默认合并重复课程不增加副本，替换模式确认后移除旧课。
 - 核对第一周日期，修改学期同时更新喝水提醒范围，但不改变原有课间点选。
 - 从旧版状态升级，课程保存后重启，原提醒、账号和留言仍保留；验证深色模式、大字体和横向滚动。
+- 北大网页导入从学校入口开始登录，HTTPS IAAA 认证后可回到选课网/门户的旧版 HTTP 页面；验证登录弹窗、确认框、返回原窗口与当前窗口识别。不要将带票据的旧回跳 URL 当作入口。
 
 ## 本次验证记录
 
@@ -52,3 +53,5 @@
 - 当前 Linux 无 Xcode、Swift 编译器和 iPhone 模拟器，尚未运行 Swift XCTest、iOS 编译、界面检查或实际通知验证。语法解析不能替代这些检查。
 
 第 002 次修改补充验证：Linux 已安装 Swift 6.0.3，28 项核心测试通过；[e504f62 的 GitHub Actions](https://github.com/QjCu/Weixin-Drinking-Notification/actions/runs/40114222228) 已通过 macOS 上的 28 项 Swift 测试、iPhone 模拟器编译和服务端检查。上方第一版“无 Swift 编译器”描述仅为历史记录。真实 OCR、学校登录及界面/通知清单尚待实机验收。
+
+第 003 次修改：[40b641e 的 GitHub Actions](https://github.com/QjCu/Weixin-Drinking-Notification/actions/runs/40849008391) 通过 36 项核心测试、3 项本地 HTML 的真实 WebKit 模拟器测试、App 编译与服务端检查。学校账户登录仍需真机验收。

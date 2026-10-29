@@ -51,7 +51,7 @@ GitHub 分支：`version2`，基于 `codex/siptime-mvp` 创建。后续需求继
 - 修复原先将所有非 HTTPS 导航一律取消的问题：仅对北大选课网 `elective.pku.edu.cn` 与校内门户 `portal.pku.edu.cn` 的默认/80 端口允许旧版 HTTP 页面与认证回跳，IAAA 登录页保持 HTTPS。
 - Debug/Release 的 ATS 配置加入上述两个精确域名例外，不放开其他子域名、不关闭证书校验，不修改留言 API 的 HTTPS 校验。
 - 登录新窗口按 WebKit 提供的配置创建，保留与原页面的关联和同一临时会话；支持返回、关闭子窗口、网页脚本确认及输入，导入读取当前显示的页面。
-- 补充空白子框架/登录窗口的导航处理，错误仅显示协议和域名，不显示含登录票据的 URL 参数。关闭整个窗口时释放会话与未完成的网页对话框。
+- 补充空白子框架/登录窗口的导航处理，兼容 WebKit 为无参数 `window.open()` 提供的 nil/空 URL；仅在新窗口或已知弹窗初始化时将其视作空白页。导航错误仅显示协议和域名，不显示含登录票据的 URL 参数。关闭整个窗口时释放会话与未完成的网页对话框。
 - 增加可独立测试的导航策略与回归用例，覆盖 HTTPS IAAA、HTTP 学校回跳、弹窗空白页、域名伪装、端口与凭据隔离。
 
-验证：Linux Swift 6.0.3 的 35 项核心测试通过（含 7 项新增导航策略测试），Swift 语法及两份 plist 的域名例外检查通过。另新增 3 项使用本地 HTML 的真实 WebKit 模拟器回归测试，覆盖新窗口与 opener 关联、共享临时会话、当前窗口读取及待处理确认框释放，随 GitHub Actions 执行。没有访问用户账号或代填密码；真实学校登录链路需用户在手机上重新验证。使用方法见 [学校登录说明](course-import.md#北大登录回跳兼容003)。
+验证：Linux Swift 6.0.3 的 36 项核心测试通过（含 8 项新增导航策略测试），Swift 语法及两份 plist 的域名例外检查通过。[最终修复代码 40b641e 的 GitHub Actions](https://github.com/QjCu/Weixin-Drinking-Notification/actions/runs/40849008391) 已通过 macOS 上的 36 项核心测试、iPhone 模拟器编译及服务端检查；新增 3 项真实 WebKit 运行测试全部通过，覆盖无参数打开空白登录窗口、opener 关联与共享临时会话、关闭回到原窗口、当前窗口读取及待处理确认框释放，日志为 BUILD SUCCEEDED / TEST SUCCEEDED。测试使用本地 HTML，没有访问用户账号或代填密码；真实学校登录链路需用户在手机上重新验证。使用方法见 [学校登录说明](course-import.md#北大登录回跳兼容003)。
