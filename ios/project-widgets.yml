@@ -1,0 +1,32 @@
+# Opt-in configuration. Default project.yml builds the standalone App.
+include:
+  - path: project.yml
+settings:
+  base:
+    SIPTIME_APP_GROUP: group.com.example.SipTime
+    SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) SIPTIME_WIDGETS
+targets:
+  SipTime:
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: Shared/AppGroups.entitlements
+    dependencies:
+      - target: SipTimeWidgets
+        embed: true
+  SipTimeWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SipTimeWidgets
+        excludes: [Info.plist]
+      - path: Shared
+        excludes: [AppGroups.entitlements]
+      - path: SipTime/Models.swift
+      - path: SipTime/CourseModels.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(SIPTIME_BUNDLE_ID).widgets
+        INFOPLIST_FILE: SipTimeWidgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Shared/AppGroups.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES

@@ -78,7 +78,9 @@ struct TodayView: View {
                 } header: { Text("提醒状态") } footer: {
                     Text("打开 App 会补充最多 60 条本地通知。超过已安排日期后，需要再次打开补充。专注模式或通知摘要可能影响显示时间。")
                 }
+#if SIPTIME_WIDGETS
                 Section("桌面课表小组件") { Text(store.widgetStatus).font(.footnote) }
+#endif
                 Section("今天接下来的提醒") {
                     if today.isEmpty { Text("今天暂无后续提醒").foregroundStyle(.secondary) }
                     ForEach(today, id: \.self) { date in

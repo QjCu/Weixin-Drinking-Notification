@@ -1,6 +1,8 @@
 import Foundation
 import Combine
+#if SIPTIME_WIDGETS
 import WidgetKit
+#endif
 
 @MainActor
 final class AppStore: ObservableObject {
@@ -10,7 +12,9 @@ final class AppStore: ObservableObject {
     @Published private(set) var status = "正在检查提醒"
     @Published private(set) var isBusy = false
     @Published var error: String?
+#if SIPTIME_WIDGETS
     @Published private(set) var widgetStatus = "打开 App 会同步课程到小组件"
+#endif
     @Published var notice: String?
     private let scheduler = NotificationScheduler()
     private let file: URL
@@ -41,6 +45,7 @@ final class AppStore: ObservableObject {
     private func save() throws {
         let data = try JSONEncoder().encode(state)
         try data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+#if SIPTIME_WIDGETS
         do {
             let snapshot = CourseWidgetSnapshot(plan: state.plan, timetable: state.timetable ?? CourseTimetable())
             if try CourseWidgetStorage.write(snapshot) { WidgetCenter.shared.reloadTimelines(ofKind: CourseWidgetStorage.kind) }
@@ -48,6 +53,7 @@ final class AppStore: ObservableObject {
         } catch {
             widgetStatus = "小组件暂未同步，请检查 App 与小组件的共享配置；App 内课表已保存"
         }
+#endif
     }
     private func perform(_ action: () async throws -> Void) async {
         guard !isBusy, storageReady else { return }

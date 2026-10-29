@@ -82,3 +82,10 @@ GitHub 分支：`version2`，基于 `codex/siptime-mvp` 创建。后续需求继
 - XcodeGen 统一配置 App/扩展的 Bundle ID、共享组和嵌入关系，详见 [小组件安装配置](widgets.md)。
 
 验证：55 项核心测试通过，覆盖单双周、课间状态、下一次跨空周查找、刷新边界与共享快照字段隔离。[33deddb 的 GitHub Actions](https://github.com/QjCu/Weixin-Drinking-Notification/actions/runs/40863447651) 通过主 App 与 WidgetKit 扩展的模拟器编译、4 项现有模拟器回归测试及服务端检查。尚未用用户团队完成真机 App Groups 签名、跨进程同步与主屏幕展示验收；需要按安装说明配置后验证。
+
+## 007 · 小组件保留为可选功能
+
+- 默认 `project.yml` 只构建普通 App，不嵌入 WidgetKit 扩展，也不配置 App Groups entitlement，避免当前账号的能力限制阻碍正常安装。
+- 普通版编译时不执行小组件共享、刷新或显示同步状态；现有课表、提醒、账号与本地数据保留。
+- 小组件源码、共享模型、测试和签名配置保留在仓库，未来可通过 `xcodegen generate --spec project-widgets.yml` 明确启用。
+- CI 分别检查普通版无扩展/共享签名依赖、编译普通版并运行现有回归，然后生成和编译可选小组件版。

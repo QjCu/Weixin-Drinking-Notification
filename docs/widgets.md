@@ -1,10 +1,14 @@
-# iPhone 主屏幕课表小组件（006）
+# iPhone 主屏幕课表小组件（006，007 起默认保留但不启用）
+
+当前普通 `xcodegen generate` 只生成主 App，不包含小组件扩展、不申请 App Groups，也不会显示同步失败提示。小组件完整源码和测试仍保留。当前账号不支持时，无需配置共享组，正常更新主 App 即可。
+
+以后账号支持时，使用下文的可选配置启用。
 
 提供三个尺寸：小号显示下一节课（当前正在上课时显示当前课），中号显示今天接下来的两门课，大号显示完整七天课表。名称优先使用个人备注，单双周、学期和实际上课时间沿用 App 的课程与学校作息。点击小组件进入 App 的课表页。
 
 ## 首次安装配置
 
-此次增加 WidgetKit 扩展和 App Groups 共享容器，必须重新生成 Xcode 工程。先保留你原来的 Team、Bundle Identifier，拉取 version2，然后修改本地 `ios/project.yml` 的顶层 settings/base：
+此次增加 WidgetKit 扩展和 App Groups 共享容器，必须重新生成 Xcode 工程。先保留你原来的 Team、Bundle Identifier，拉取 version2，然后将原 Bundle ID 保留在本地 `ios/project.yml` 的 settings/base，将共享组标识设置在 `ios/project-widgets.yml` 的 settings/base：
 
 ```yaml
 SIPTIME_BUNDLE_ID: 你之前使用的App标识
@@ -13,7 +17,7 @@ SIPTIME_APP_GROUP: group.你注册的唯一共享组标识
 
 保留原 App 标识以覆盖原 App 和保留数据；小组件扩展标识自动是该标识加 `.widgets`。示例 `com.example.SipTime` 和 `group.com.example.SipTime` 只是占位值，不应直接用于自己的真机签名。
 
-在 ios 目录运行 `xcodegen generate`，再 `open SipTime.xcodeproj`。
+在 ios 目录运行 `xcodegen generate --spec project-widgets.yml`，再 `open SipTime.xcodeproj`。要恢复不带小组件的普通版，再运行 `xcodegen generate --spec project.yml` 即可；重新生成后恢复原 Team 和 Bundle ID。
 
 在 Xcode 的 **Signing & Capabilities** 中，分别选择 **SipTime** 与 **SipTimeWidgets** 两个 target，选择同一个开发团队、自动管理签名，并在 **App Groups** 中创建/勾选同一个已注册共享组。该值必须与 `SIPTIME_APP_GROUP` 完全一致。App Groups 能否使用取决于开发团队所支持的能力；如果 Xcode 提示当前 Personal Team 不支持该能力，需要先解决团队能力/签名配置，不能仅靠重编译实现跨进程同步。参见苹果[添加能力](https://developer.apple.com/documentation/xcode/adding-capabilities-to-your-app)和[配置 App Groups](https://developer.apple.com/documentation/xcode/configuring-app-groups)。
 
